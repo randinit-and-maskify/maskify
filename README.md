@@ -14,11 +14,11 @@ Given the following inputs from the user:
 The pipeline creates segmentation masks based on the user's labels and outputs the data as a binary .npy file, where each pixel value represents either the background (0) or the object (1). This information can be used to randomize backgrounds, enhancing a model's ability to generalize across diverse scenarios and improving its robustness to environmental variations.
 
 # Installation
-1. Clone the repository
+1. Clone the repository:
 ```
 git clone https://github.com/hlenwng/maskify.git
 ```
-2. Install dependencies with conda
+2. Install dependencies with conda:
 ```
 conda env create -f environment.yml
 conda activate maskify
@@ -28,7 +28,7 @@ conda activate maskify
 1. Edit the example `labels.json` file with your list of object descriptions. 
 
    - For example, "small white ceramic mug."
-2. Upload your image(s) into the `images` folder
+2. Upload your image(s) into the `images` folder.
 3. Run pipeline using:
 ```
 python run_seg_to_binary.py
@@ -39,6 +39,7 @@ python run_seg_to_binary.py
     ├── output_images/img#_detections.png                     
     ├── output_binary/img#_mask.npy       
 ```
+5. Optional: Use `check.ipynb` to visualize  `img#_mask.npy` binary file.
 
 # Directory structure
 ```
