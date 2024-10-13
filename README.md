@@ -26,7 +26,7 @@ pip install -e .
 ```
 
 # Pipeline tutorial
-1. Edit the .json file with your list of object descriptions. 
+1. Edit the example `labels.json` file with your list of object descriptions. 
 - For example, "small white ceramic mug."
 2. Upload your image(s) into the `images` folder
 3. Run pipeline using:
