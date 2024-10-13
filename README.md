@@ -15,7 +15,7 @@ git clone https://github.com/hlenwng/maskify.git
 ```
 2. Install dependencies with conda
 ```
-conda env create -f conda/environment.yml
+conda env create -f environment.yml
 conda activate maskify
 pip install -e .
 ```
