@@ -1,0 +1,15 @@
+name: maskify  
+channels:
+  - defaults
+  - conda-forge  
+dependencies:
+  - python=3.9
+  - opencv
+  - numpy
+  - pillow  
+  - matplotlib
+  - plotly
+  - pip
+  - pip:
+      - git+https://github.com/huggingface/transformers
+      - requests
