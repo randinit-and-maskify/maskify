@@ -22,7 +22,6 @@ git clone https://github.com/hlenwng/maskify.git
 ```
 conda env create -f environment.yml
 conda activate maskify
-pip install -e .
 ```
 
 # Pipeline tutorial
