@@ -1,5 +1,5 @@
 # Maskify
-This pipeline takes an image, creates segmentation masks of specified objects, and outputs the data as a binary .npy file.
+This pipeline takes an image, creates segmentation masks of specified objects, and outputs the data as a binary `.npy` file.
 <center>
   <img src="https://github.com/user-attachments/assets/2aa7e6e9-50c1-45f9-adb1-4c476ab5703b" alt="image with detections" width="300" height="195">
   <img src="https://github.com/user-attachments/assets/ae5aaeae-0f61-4f57-9eb1-d5d7659a1496" alt="image with detections" width="300" height="205">
@@ -22,7 +22,6 @@ git clone https://github.com/hlenwng/maskify.git
 ```
 conda env create -f environment.yml
 conda activate maskify
-pip install -e .
 ```
 
 # Pipeline tutorial
@@ -32,4 +31,16 @@ pip install -e .
 3. Run pipeline using:
 ```
 python run_seg_to_binary.py
+```
+
+# Directory structure
+```
+/example_dir/
+    ├── run_seg_to_binary.py        # Main script
+    ├── labels.json                 # (Input) File containing object labels/descriptions
+    ├── images/                     # (Input) Folder containing '.png' images
+    ├── output/                     # (Output) Folder to store output files
+        ├── output_images/          # (Output) Folder to store output images with seg masks
+        ├── output_binary/          # (Output) Folder to store output '.npy' binary files of seg masks
+    ├── check.ipynb                 # (Output) File to visualize '.npy' files
 ```
