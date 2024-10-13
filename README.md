@@ -26,11 +26,18 @@ conda activate maskify
 
 # Pipeline tutorial
 1. Edit the example `labels.json` file with your list of object descriptions. 
-- For example, "small white ceramic mug."
+
+   - For example, "small white ceramic mug."
 2. Upload your image(s) into the `images` folder
 3. Run pipeline using:
 ```
 python run_seg_to_binary.py
+```
+4. The pipeline will write 2 files:
+```
+/example_dir/output
+    ├── output_images/img#_detections.png                     
+    ├── output_binary/img#_mask.npy       
 ```
 
 # Directory structure
