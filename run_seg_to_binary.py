@@ -30,9 +30,12 @@ import os
 import json
 
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 from pathlib import Path
 from typing import List, Tuple, Optional, Any, Dict
+
+torch.cuda.empty_cache()
 
 #logger = get_logger(__name__)
 
@@ -280,20 +283,19 @@ def detect(
     image: Image.Image,
     labels: List[str],
     threshold: float = 0.3,
-    detector_id: Optional[str] = None
+    detector_id: Optional[str] = "IDEA-Research/grounding-dino-tiny", 
 ) -> List[Dict[str, Any]]:
     """
     Use Grounding DINO to detect a set of labels in an image in a zero-shot fashion.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    detector_id = detector_id if detector_id is not None else "IDEA-Research/grounding-dino-tiny"
+    #detector_id = detector_id if detector_id is not None else "IDEA-Research/grounding-dino-tiny"
     object_detector = pipeline(model=detector_id, task="zero-shot-object-detection", device=device)
 
     labels = [label if label.endswith(".") else label+"." for label in labels]
 
     results = object_detector(image,  candidate_labels=labels, threshold=threshold)
     results = [DetectionResult.from_dict(result) for result in results]
-
     return results
 
 def segment(
@@ -306,7 +308,7 @@ def segment(
     Use Segment Anything (SAM) to generate masks given an image + a set of bounding boxes.
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    segmenter_id = segmenter_id if segmenter_id is not None else "facebook/sam-vit-base"
+    #segmenter_id = segmenter_id if segmenter_id is not None else "facebook/sam-vit-base"
 
     segmentator = AutoModelForMaskGeneration.from_pretrained(segmenter_id).to(device)
     processor = AutoProcessor.from_pretrained(segmenter_id)
@@ -330,89 +332,138 @@ def segment(
 
 #Added code by Helen Wang 
 
-def load_image(image_path: str) -> np.ndarray:
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError(f"Error loading image: {image_path}")
+# Load pipelines/models if not set
+detector_id = "IDEA-Research/grounding-dino-tiny"
+segmenter_id = "facebook/sam-vit-base"
+
+class ImageDataset(Dataset):
+    def __init__(self, image_folder: str, labels: List[str]):
+        self.image_paths = sorted(list(Path(image_folder).glob("*.png")))
+        self.labels = labels
+        self.transform = transforms.ToTensor()
+        # self.transform = transforms.Compose([
+        #     transforms.ToTensor()
+        # ])
     
-    #Convert image from BGR (OpenCV) to RGB
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    def __len__(self):
+        return len(self.image_paths)
     
-    #Convert image to a PIL Image (what the transformers expects)
-    image_pil = Image.fromarray(image_rgb)
-    
-    return image_pil
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        image = load_image(str(image_path))
+        image_tensor = self.transform(image)
+        image_name = image_path.stem
+        return image_tensor, image_name
+        #image_url = str(image_path)
+
+        # with torch.no_grad():
+        #     image_array, segmentation_mask, detections = grounded_segmentation(
+        #         image=image_url,
+        #         labels=self.labels,
+        #         threshold=0.3,
+        #         polygon_refinement=False,
+        #         detector_id=detector_id,
+        #         segmenter_id=segmenter_id
+        #     )
+        
+        #     # Apply transformation to image_array
+        #     if isinstance(image_array, np.ndarray):
+        #         image_array = Image.fromarray(image_array)
+        #     image_array = self.transform(image_array)
+            
+        #     return image_array, segmentation_mask, detections
+
+
+def load_image(image_path: str) -> Image.Image:
+    # image = cv2.imread(image_path)
+    # if image is None:
+    #     raise ValueError(f"Error loading image: {image_path}")
+    # image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = Image.open(image_path).convert("RGB")
+    return image
 
 #Process image with grounded segmentation
 def grounded_segmentation(
-    image: str,
+    image: Image.Image,
     labels: List[str],
     threshold: float,
     polygon_refinement: bool,
-    detector_id: Optional[str],
-    segmenter_id: Optional[str]
-) -> Tuple[np.ndarray, np.ndarray]:
+    detector_id: Optional[str] = "IDEA-Research/grounding-dino-tiny",
+    segmenter_id: Optional[str] = "facebook/sam-vit-base"
+) -> Tuple[np.ndarray, np.ndarray, list]:
     print(f"Running grounded segmentation on image: {image}")
-    image_pil = load_image(image)
+    # image_pil = load_image(image)
 
-    #Detect and segment
-    detections = detect(image_pil, labels, threshold, detector_id)
-    detections = segment(image_pil, detections, polygon_refinement, segmenter_id)
+    #query_mask = query_mask.to(torch.float32)
 
-    #Create a binary segmentation mask
-    mask = np.zeros((image_pil.height, image_pil.width), dtype=np.uint8)
+    # Detect and segment
+    detections = detect(image, labels, threshold, detector_id)
+    detections = segment(image, detections, polygon_refinement, segmenter_id)
 
+    # Create a binary segmentation mask
+    mask = np.zeros((image.height, image.width), dtype=np.uint8)
     for detection in detections:
         if detection.mask is not None:
-            mask[detection.mask == 1] = 1  #Apply mask to binary mask
+            mask[detection.mask == 1] = 1  # Apply mask to binary mask
 
-    return np.array(image_pil), mask, detections
+    return np.array(image), mask, detections
+
+torch.set_default_dtype(torch.float32)
 
 def run_batch_inference(
     image_folder: str, 
     current_dir: Path,
     labels: List[str], 
-    batch_size: int = 8, 
+    batch_size: int, 
     threshold: float = 0.3, 
     polygon_refinement: bool = False, 
-    detector_id: Optional[str] = None, 
-    segmenter_id: Optional[str] = None
-) -> None:
-    image_paths = sorted(list(Path(image_folder).glob("*.png")))
+    detector_id: Optional[str] = "IDEA-Research/grounding-dino-tiny", 
+    segmenter_id: Optional[str] = "facebook/sam-vit-base"
+):
     
+    # Set up output directories 
     output_dir = current_dir / "output"
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_images_dir = output_dir / "output_images"
+    output_binary_dir = output_dir / "output_binary"
+    output_images_dir.mkdir(parents=True, exist_ok=True)
+    output_binary_dir.mkdir(parents=True, exist_ok=True)
+
+    # Initialize dataset and data loader
+    dataset = ImageDataset(image_folder, labels)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+
+    # # Load pipelines/models if not set
+    # detector_id = detector_id if detector_id else "IDEA-Research/grounding-dino-tiny"
+    # segmenter_id = segmenter_id if segmenter_id else "facebook/sam-vit-base"
     
-    for i in range(0, len(image_paths), batch_size):
-        batch_paths = image_paths[i:i + batch_size]
-        
-        for image_path in batch_paths:
-            image_url = str(image_path)
+    # for batch in dataloader:
+    #     for image_array, segmentation_mask, detections, image_name in batch:
+    #         if segmentation_mask is not None and segmentation_mask.size > 0:
+    #             # Save binary mask as .npy file
+    #             np.save(str(output_binary_dir / f"{image_name}_mask.npy"), segmentation_mask)
+                
+    #             # Optionally save annotated image
+    #             annotated_image_path = output_images_dir / f"{image_name}_segmented.png"
+    #             plot_detections(image_array, detections, save_name=str(annotated_image_path))
+
+    #             del batch
+    #             torch.cuda.empty_cache()
+
+    for images, image_names in dataloader:
+        for image_tensor, image_name in zip(images, image_names):
+            image_pil = transforms.ToPILImage()(image_tensor)
             image_array, segmentation_mask, detections = grounded_segmentation(
-                image=image_url,
+                image=image_pil,
                 labels=labels,
                 threshold=threshold,
                 polygon_refinement=polygon_refinement,
                 detector_id=detector_id,
                 segmenter_id=segmenter_id
             )
-
-            #Check if segmentation_mask is valid
-            if segmentation_mask is not None and segmentation_mask.size > 0:
-                #Save the segmentation mask as a binary .npy file
-                npy_output_path = output_dir / "output_binary" / f"{image_path.stem}_mask.npy"
-                npy_output_path.parent.mkdir(parents=True, exist_ok=True)
-                np.save(npy_output_path, segmentation_mask)
-                print(f"Saved segmentation mask as binary format: {npy_output_path}")
-
-                #Save detection result as PNG with segmentation masks
-                png_output_path = output_dir / "output_image" / f"{image_path.stem}_detections.png"
-                png_output_path.parent.mkdir(parents=True, exist_ok=True)
-                plot_detections(image_array, detections, str(png_output_path))
-                print(f"Saved image with segmentation masks: {png_output_path}")
-            else:
-                print(f"Segmentation mask is invalid for image: {image_url}")
+            np.save(output_binary_dir / f"{image_name}_mask.npy", segmentation_mask)
+            annotated_image_path = output_images_dir / f"{image_name}_segmented.png"
+            plot_detections(image_array, detections, save_name=str(annotated_image_path))
+            torch.cuda.empty_cache()
 
     print("Batch inference completed.")
 
@@ -424,11 +475,9 @@ def load_labels(labels_file: Path) -> List[str]:
 
 def main() -> None:
     current_dir = Path().resolve() #Get user's current directory
-
     image_folder = current_dir / "images"
     labels_file = current_dir / "labels.json"
-
-    batch_size = 8
+    batch_size = 4
     labels = load_labels(Path(labels_file))
 
     run_batch_inference(str(image_folder), current_dir, labels, batch_size=batch_size)
