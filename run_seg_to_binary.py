@@ -509,7 +509,7 @@ def main() -> None:
     labels_file = current_dir / "labels.json"
     batch_size = 4
     labels = load_labels(Path(labels_file))
-    backgrounds_root = Path("/home/ubuntu/.cache/kagglehub/datasets/itsahmad/indoor-scenes-cvpr-2019/versions/1/indoorCVPR_09/Images")
+    backgrounds_root = Path(current_dir / "background_dataset")
 
     run_batch_inference(str(image_folder), current_dir, labels, batch_size=batch_size, backgrounds_root=backgrounds_root)
 
