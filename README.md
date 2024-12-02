@@ -1,4 +1,3 @@
-![img0_overlay](https://github.com/user-attachments/assets/20f42e20-05ea-44d2-a194-786ce1cebe23)# Maskify
 This pipeline takes an image, creates segmentation masks of specified objects, and outputs an image with the object overlayed on a random background. 
 <center>
   <img src="https://github.com/user-attachments/assets/2aa7e6e9-50c1-45f9-adb1-4c476ab5703b" alt="original image" width="300" height="195">
