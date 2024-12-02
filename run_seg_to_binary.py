@@ -7,6 +7,7 @@
     ├── output/                     # Folder to store output files
         ├── output_images/          # Folder to store output images with seg masks
         ├── output_binary/          # Folder to store output numpy binary files of seg masks
+        ├── output_overlay/         # Folder to store output images with seg masks overlaid on random backgrounds
 '''
 
 #pip install --upgrade -q git+https://github.com/huggingface/transformers
@@ -28,10 +29,8 @@ import plotly.graph_objects as go
 from transformers import AutoModelForMaskGeneration, AutoProcessor, pipeline
 import os
 import json
-
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-
 from pathlib import Path
 from typing import List, Tuple, Optional, Any, Dict
 
@@ -341,9 +340,6 @@ class ImageDataset(Dataset):
         self.image_paths = sorted(list(Path(image_folder).glob("*.png")))
         self.labels = labels
         self.transform = transforms.ToTensor()
-        # self.transform = transforms.Compose([
-        #     transforms.ToTensor()
-        # ])
     
     def __len__(self):
         return len(self.image_paths)
@@ -354,31 +350,8 @@ class ImageDataset(Dataset):
         image_tensor = self.transform(image)
         image_name = image_path.stem
         return image_tensor, image_name
-        #image_url = str(image_path)
-
-        # with torch.no_grad():
-        #     image_array, segmentation_mask, detections = grounded_segmentation(
-        #         image=image_url,
-        #         labels=self.labels,
-        #         threshold=0.3,
-        #         polygon_refinement=False,
-        #         detector_id=detector_id,
-        #         segmenter_id=segmenter_id
-        #     )
-        
-        #     # Apply transformation to image_array
-        #     if isinstance(image_array, np.ndarray):
-        #         image_array = Image.fromarray(image_array)
-        #     image_array = self.transform(image_array)
-            
-        #     return image_array, segmentation_mask, detections
-
 
 def load_image(image_path: str) -> Image.Image:
-    # image = cv2.imread(image_path)
-    # if image is None:
-    #     raise ValueError(f"Error loading image: {image_path}")
-    # image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = Image.open(image_path).convert("RGB")
     return image
 
@@ -391,10 +364,8 @@ def grounded_segmentation(
     detector_id: Optional[str] = "IDEA-Research/grounding-dino-tiny",
     segmenter_id: Optional[str] = "facebook/sam-vit-base"
 ) -> Tuple[np.ndarray, np.ndarray, list]:
+    
     print(f"Running grounded segmentation on image: {image}")
-    # image_pil = load_image(image)
-
-    #query_mask = query_mask.to(torch.float32)
 
     # Detect and segment
     detections = detect(image, labels, threshold, detector_id)
@@ -418,36 +389,24 @@ def run_batch_inference(
     threshold: float = 0.3, 
     polygon_refinement: bool = False, 
     detector_id: Optional[str] = "IDEA-Research/grounding-dino-tiny", 
-    segmenter_id: Optional[str] = "facebook/sam-vit-base"
+    segmenter_id: Optional[str] = "facebook/sam-vit-base",
+    backgrounds_root: Path = None
 ):
     
     # Set up output directories 
-    output_dir = current_dir / "output"
-    output_images_dir = output_dir / "output_images"
-    output_binary_dir = output_dir / "output_binary"
+    output_dir = Path(current_dir / "output")
+    output_images_dir = Path(output_dir / "output_images")
+    output_binary_dir = Path(output_dir / "output_binary")
+    output_overlay_dir = Path(output_dir / "output_overlay")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
     output_images_dir.mkdir(parents=True, exist_ok=True)
     output_binary_dir.mkdir(parents=True, exist_ok=True)
+    output_overlay_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize dataset and data loader
     dataset = ImageDataset(image_folder, labels)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-
-    # # Load pipelines/models if not set
-    # detector_id = detector_id if detector_id else "IDEA-Research/grounding-dino-tiny"
-    # segmenter_id = segmenter_id if segmenter_id else "facebook/sam-vit-base"
-    
-    # for batch in dataloader:
-    #     for image_array, segmentation_mask, detections, image_name in batch:
-    #         if segmentation_mask is not None and segmentation_mask.size > 0:
-    #             # Save binary mask as .npy file
-    #             np.save(str(output_binary_dir / f"{image_name}_mask.npy"), segmentation_mask)
-                
-    #             # Optionally save annotated image
-    #             annotated_image_path = output_images_dir / f"{image_name}_segmented.png"
-    #             plot_detections(image_array, detections, save_name=str(annotated_image_path))
-
-    #             del batch
-    #             torch.cuda.empty_cache()
 
     for images, image_names in dataloader:
         for image_tensor, image_name in zip(images, image_names):
@@ -463,15 +422,86 @@ def run_batch_inference(
             np.save(output_binary_dir / f"{image_name}_mask.npy", segmentation_mask)
             annotated_image_path = output_images_dir / f"{image_name}_segmented.png"
             plot_detections(image_array, detections, save_name=str(annotated_image_path))
+
+            random_background_path = get_random_background(backgrounds_root)
+            overlay_objects_on_background(
+                image_path=image_array,
+                binary_mask_path=str(output_binary_dir / f"{image_name}_mask.npy"),
+                output_path=str(output_overlay_dir / f"{image_name}_overlay.png"),
+                background_path=random_background_path
+            )
+
             torch.cuda.empty_cache()
 
     print("Batch inference completed.")
 
-#Load labels from labels.json (provided by user)
+# Load labels from labels.json (provided by user)
 def load_labels(labels_file: Path) -> List[str]:
     with open(labels_file, 'r') as f:
         labels_data = json.load(f)
     return labels_data['labels']
+
+def overlay_objects_on_background(
+    image_path,
+    binary_mask_path,
+    output_path,
+    background_path
+):
+    # If image_path is already a NumPy array, use it directly
+    if isinstance(image_path, np.ndarray):
+        original_image = image_path  # Use image array directly if passed
+    else:
+        print(f"Attempting to load image from path: {image_path}")
+        # Ensure the image is in BGR format for OpenCV
+        original_image = cv2.cvtColor(np.array(image_path), cv2.COLOR_RGB2BGR) 
+
+    if original_image is None:
+        raise ValueError(f"Failed to load image from {image_path}")
+
+    print(f"Original image shape: {original_image.shape}")
+
+    # Ensure binary mask file exists
+    if not os.path.exists(binary_mask_path):
+        raise FileNotFoundError(f"Binary mask file not found at {binary_mask_path}")
+
+    # Load binary mask
+    binary_mask = np.load(binary_mask_path)
+    binary_mask = cv2.resize(binary_mask, (original_image.shape[1], original_image.shape[0]))
+    binary_mask = binary_mask.astype(np.uint8)
+    binary_mask = (binary_mask > 0).astype(np.uint8)
+    inverted_mask = 1 - binary_mask
+
+    # Load the background image
+    background_image = cv2.imread(background_path)
+    if background_image is None:
+        raise ValueError(f"Failed to load background image from {background_path}")
+    background_image = cv2.resize(background_image, (original_image.shape[1], original_image.shape[0]))
+
+    # Ensure both images are 3-channel (BGR)
+    if len(original_image.shape) != 3 or len(background_image.shape) != 3:
+        raise ValueError("Both the original image and background must be 3-channel images")
+    
+    # Ensure both images are in BGR format
+    original_image = original_image[..., ::-1]  
+    background_image = background_image[..., ::-1]  
+
+    # Extract object region (foreground) using the mask
+    object_region = cv2.bitwise_and(original_image, original_image, mask=binary_mask)
+
+    # Extract background region
+    background_region = cv2.bitwise_and(background_image, background_image, mask=inverted_mask)
+
+    # Combine the object and background: place object on the background
+    combined_image = cv2.add(object_region, background_region)
+
+    # Save the combined image in BGR format
+    cv2.imwrite(output_path, combined_image)
+    print(f"Overlay image saved to {output_path}")
+
+def get_random_background(backgrounds_root: Path) -> str:
+    # Get all background images from subdirectories
+    background_images = list(backgrounds_root.rglob("*.jpg"))
+    return str(random.choice(background_images)) if background_images else None
 
 def main() -> None:
     current_dir = Path().resolve() #Get user's current directory
@@ -479,8 +509,9 @@ def main() -> None:
     labels_file = current_dir / "labels.json"
     batch_size = 4
     labels = load_labels(Path(labels_file))
+    backgrounds_root = Path("/home/ubuntu/.cache/kagglehub/datasets/itsahmad/indoor-scenes-cvpr-2019/versions/1/indoorCVPR_09/Images")
 
-    run_batch_inference(str(image_folder), current_dir, labels, batch_size=batch_size)
+    run_batch_inference(str(image_folder), current_dir, labels, batch_size=batch_size, backgrounds_root=backgrounds_root)
 
 if __name__ == "__main__":
     main()
