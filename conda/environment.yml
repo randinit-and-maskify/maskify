@@ -199,4 +199,3 @@ dependencies:
       - wsproto==1.2.0
       - xyzservices==2024.6.0
       - zarr==2.18.2
-prefix: /home/ubuntu/miniconda3/envs/maskify
