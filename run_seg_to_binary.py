@@ -38,7 +38,10 @@ torch.cuda.empty_cache()
 
 #logger = get_logger(__name__)
 
-#Code from Grounding DINO: https://github.com/IDEA-Research/Grounded-Segment-Anything
+'''
+The functions below were adapted from code from Grounded SAM: 
+Citation: Ren, Tianhe, et al. "Grounded sam: Assembling open-world models for diverse visual tasks." arXiv preprint arXiv:2401.14159 (2024)
+'''
 
 #Store detection results
 @dataclass
@@ -329,7 +332,9 @@ def segment(
 
     return detection_results
 
-#Added code by Helen Wang 
+'''
+The code below was added by Helen Wang 
+'''
 
 # Load pipelines/models if not set
 detector_id = "IDEA-Research/grounding-dino-tiny"
