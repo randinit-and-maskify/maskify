@@ -56,3 +56,6 @@ python run_seg_to_binary.py
         ├── output_overlay/         # (Output) Folder to store output images with random background
     ├── check.ipynb                 # (Output) File to visualize '.npy' files
 ```
+
+# References
+This project includes code adapted from Grounded SAM: Ren, Tianhe, et al. "Grounded sam: Assembling open-world models for diverse visual tasks." arXiv preprint arXiv:2401.14159 (2024). 
