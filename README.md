@@ -1,11 +1,6 @@
 This pipeline takes an image, creates segmentation masks of specified objects, and outputs an image with the object overlayed on a random background. 
 <center>
-  <img src="https://github.com/user-attachments/assets/2aa7e6e9-50c1-45f9-adb1-4c476ab5703b" alt="original image" width="300" height="205">
-  <img src="https://github.com/user-attachments/assets/ae5aaeae-0f61-4f57-9eb1-d5d7659a1496" alt="image with detections" width="305" height="210">
-  <img src="https://github.com/user-attachments/assets/f6d3a5b1-8014-415f-b701-1154a5c8fd1c" alt="binary image" width="305" height="210">
-  <img src="https://github.com/user-attachments/assets/154d671e-bbff-4d57-88b5-66631568bfaf" alt="overlay image 1" width="300" height="205">
-  <img src="https://github.com/user-attachments/assets/14085928-f212-4fb7-aa1c-24248ac63008" alt="overlay image 2" width="300" height="205">
-  <img src="https://github.com/user-attachments/assets/b85ab573-88d4-4efa-a368-9a33d703c429" alt="overlay image 3" width="300" height="205">  
+  <img src="https://github.com/user-attachments/assets/dcc74b55-04da-435a-a47f-eb5b02fb7477" alt="input and outputs" width="500" height="500">
 </center>
 
 # Overview
